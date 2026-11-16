@@ -1,0 +1,2327 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>OdotTrack - Monitoring Budidaya Rumput Odot</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Plus Jakarta Sans & Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        display: ['Plus Jakarta Sans', 'sans-serif'],
+                    },
+                    colors: {
+                        emerald: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            200: '#a7f3d0',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857',
+                            800: '#065f46',
+                            900: '#064e3b',
+                        }
+                    },
+                    boxShadow: {
+                        'android': '0 2px 8px -1px rgba(6, 78, 59, 0.08), 0 1px 3px -1px rgba(6, 78, 59, 0.04)',
+                        'fab': '0 6px 16px rgba(5, 150, 105, 0.35)',
+                        'sheet': '0 -8px 25px -5px rgba(0, 0, 0, 0.15)',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar hiding for clean mobile app feel */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Smooth transitions for bottom sheets & modals */
+        .sheet-backdrop {
+            transition: opacity 0.25s ease-out;
+        }
+        .sheet-content {
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sheet-hidden .sheet-backdrop {
+            opacity: 0;
+            pointer-events: none;
+        }
+        .sheet-hidden .sheet-content {
+            transform: translateY(100%);
+        }
+        
+        /* Ripple-like active state for Android touch feel */
+        .android-tap:active {
+            transform: scale(0.97);
+            transition: transform 0.1s ease;
+        }
+
+        body {
+            background-color: #f1f5f9;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-emerald-200 selection:text-emerald-900">
+
+    <!-- Mobile App Shell Container (Centered on Desktop, Full on Mobile) -->
+    <div id="app-shell" class="max-w-md mx-auto min-h-screen bg-slate-50 relative shadow-2xl flex flex-col pb-24">
+        
+        <!-- Top App Bar (Material 3 Style) -->
+        <header class="sticky top-0 z-30 bg-emerald-700 text-white px-4 pt-4 pb-3 rounded-b-3xl shadow-md">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                        <i data-lucide="sprout" class="w-6 h-6 text-emerald-200"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-display font-bold text-lg leading-tight tracking-tight">OdotTrack</h1>
+                        <p class="text-xs text-emerald-100/90 font-medium">Jurnal Budidaya Rumput Odot</p>
+                    </div>
+                </div>
+                <button onclick="openResetConfirm()" title="Reset Data Contoh" class="p-2 rounded-full hover:bg-white/10 transition text-emerald-100 text-xs flex items-center gap-1">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Active Lahan Selector Pill Bar -->
+            <div class="mt-3.5 pt-2.5 border-t border-emerald-600/60 flex items-center justify-between gap-2">
+                <div class="flex items-center gap-1.5 text-xs text-emerald-100 shrink-0">
+                    <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-300"></i>
+                    <span>Lahan Aktif:</span>
+                </div>
+                <div class="relative flex-1 min-w-0">
+                    <select id="active-lahan-select" onchange="handleLahanFilterChange(this.value)" class="w-full appearance-none bg-emerald-800/80 text-white text-xs font-semibold py-1.5 pl-3 pr-8 rounded-xl border border-emerald-500/40 focus:outline-none focus:ring-2 focus:ring-emerald-300 truncate">
+                        <!-- Options injected via JS -->
+                    </select>
+                    <i data-lucide="chevron-down" class="w-4 h-4 text-emerald-200 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                </div>
+                <button onclick="openLahanModal()" class="shrink-0 bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-semibold px-2.5 py-1.5 rounded-xl flex items-center gap-1 shadow-sm android-tap">
+                    <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                    <span>Lahan</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Custom Toast / Snackbar Notification -->
+        <div id="snackbar" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 max-w-[90%] w-max bg-slate-900 text-white text-xs font-medium px-4 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 transition-all duration-300 opacity-0 -translate-y-4 pointer-events-none">
+            <i id="snackbar-icon" data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+            <span id="snackbar-text">Data berhasil disimpan</span>
+        </div>
+
+        <!-- MAIN CONTENT VIEWS -->
+        <main class="flex-1 px-4 pt-4 space-y-5">
+
+            <!-- VIEW 1: BERANDA / DASHBOARD & TIMELINE -->
+            <section id="view-beranda" class="space-y-5">
+                
+                <!-- Ringkasan Statistik Cards -->
+                <div class="grid grid-cols-3 gap-2.5">
+                    <div class="bg-white p-3 rounded-2xl shadow-android border border-slate-100 flex flex-col justify-between">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-2">
+                            <i data-lucide="land-plot" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <p class="text-[11px] font-medium text-slate-500">Total Lahan</p>
+                            <p id="stat-lahan" class="font-display font-bold text-base text-slate-800 mt-0.5">0 Lahan</p>
+                            <p id="stat-luas" class="text-[10px] text-emerald-600 font-medium">0 m²</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-3 rounded-2xl shadow-android border border-slate-100 flex flex-col justify-between">
+                        <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center mb-2">
+                            <i data-lucide="sprout" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <p class="text-[11px] font-medium text-slate-500">Total Bibit</p>
+                            <p id="stat-bibit" class="font-display font-bold text-base text-slate-800 mt-0.5">0</p>
+                            <p class="text-[10px] text-slate-400 font-medium">Stek / Batang</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-3 rounded-2xl shadow-android border border-slate-100 flex flex-col justify-between">
+                        <div class="w-8 h-8 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center mb-2">
+                            <i data-lucide="scale" class="w-4 h-4"></i>
+                        </div>
+                        <div>
+                            <p class="text-[11px] font-medium text-slate-500">Total Panen</p>
+                            <p id="stat-panen" class="font-display font-bold text-base text-slate-800 mt-0.5">0 kg</p>
+                            <p id="stat-panen-ton" class="text-[10px] text-teal-600 font-medium">0.00 Ton</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Checklist Status 6 Tahapan & Dokumentasi Foto -->
+                <div class="bg-white p-3.5 rounded-3xl shadow-android border border-slate-100 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="font-display font-bold text-xs text-slate-800">Checklist & Foto 6 Tahapan</h2>
+                            <p id="checklist-subtitle" class="text-[10px] text-slate-500">Ketuk tahapan untuk langsung mencatat + unggah foto</p>
+                        </div>
+                        <span id="checklist-progress-text" class="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">0/6 Tahap</span>
+                    </div>
+                    <div id="stage-checklist-grid" class="grid grid-cols-3 gap-2">
+                        <!-- Injected via JS: 6 stage cards with photo status & quick add -->
+                    </div>
+                </div>
+
+                <!-- Filter Kategori Tahapan (Horizontal Scroll Chips) -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="font-display font-bold text-sm text-slate-800">Timeline Progres Budidaya</h2>
+            <!-- VIEW 2: MANAJEMEN DATA LAHAN & BACKUP -->
+            <section id="view-lahan" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-display font-bold text-base text-slate-800">Daftar Lahan Budidaya</h2>
+                        <p class="text-xs text-slate-500">Kelola petak lahan rumput odot Anda</p>
+                    </div>
+                    <button onclick="openLahanModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3.5 py-2.5 rounded-2xl shadow-sm flex items-center gap-1.5 android-tap">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Tambah Lahan</span>
+                    </button>
+                </div>
+
+                <div id="lahan-list-container" class="space-y-3">
+                    <!-- Lahan Cards injected via JS -->
+                </div>
+
+                <!-- Backup & Restore Data JSON -->
+                <div class="bg-white rounded-3xl p-4 shadow-android border border-slate-100 space-y-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                            <i data-lucide="database-backup" class="w-5 h-5"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-display font-bold text-sm text-slate-800">Cadangkan & Pulihkan Data</h3>
+                            <p class="text-[11px] text-slate-500">Simpan seluruh catatan lahan & foto ke file JSON</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <button onclick="exportBackupJson()" class="py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs flex items-center justify-center gap-1.5 border border-emerald-200 android-tap">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                            <span>Ekspor JSON</span>
+                        </button>
+                        <button onclick="document.getElementById('import-json-input').click()" class="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 android-tap">
+                            <i data-lucide="upload" class="w-4 h-4"></i>
+                            <span>Impor JSON</span>
+                        </button>
+                        <input type="file" id="import-json-input" accept=".json,application/json" onchange="importBackupJson(event)" class="hidden">
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW 3: GALERI FOTO PROGRES -->
+            <section id="view-galeri" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="font-display font-bold text-base text-slate-800">Galeri Foto Per Tahapan</h2>
+                        <p class="text-xs text-slate-500">Dokumentasi visual tiap fase pertumbuhan</p>
+                    </div>
+                    <span id="galeri-count-badge" class="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">0 Foto</span>
+                </div>
+
+                <!-- Filter Tahapan di Galeri -->
+                <div id="galeri-stage-chips" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
+                    <button onclick="setGaleriStageFilter('ALL')" data-gstage="ALL" class="gstage-chip active shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-700 text-white shadow-sm transition">
+                        Semua Foto
+                    </button>
+                    <button onclick="setGaleriStageFilter('bibit')" data-gstage="bibit" class="gstage-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-200 transition">
+                        🌱 Bibit
+                    </button>
+                    <button onclick="setGaleriStageFilter('tanam')" data-gstage="tanam" class="gstage-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-200 transition">
+                        🚜 Penanaman
+                    </button>
+                    <button onclick="setGaleriStageFilter('pupuk_awal')" data-gstage="pupuk_awal" class="gstage-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-200 transition">
+                        🧪 Pupuk Awal
+                    </button>
+                    <button onclick="setGaleriStageFilter('pemeliharaan')" data-gstage="pemeliharaan" class="gstage-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-200 transition">
+                        🌿 Pemeliharaan
+                    </button>
+                    <button onclick="setGaleriStageFilter('pupuk_susulan')" data-gstage="pupuk_susulan" class="gstage-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-200 transition">
+                        ⚡ Pupuk Susulan
+                    </button>
+                    <button onclick="setGaleriStageFilter('panen')" data-gstage="panen" class="gstage-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-200 transition">
+                        🌾 Panen
+                    </button>
+                </div>
+
+                <div id="galeri-container" class="grid grid-cols-2 gap-3">
+                    <!-- Photo Grid injected via JS -->
+                </div>
+            </section>
+
+        </main>
+
+        <!-- FLOATING ACTION BUTTON (FAB) -->
+        <button onclick="openProgresModal()" class="fixed bottom-20 right-4 sm:right-[calc(50%-208px)] z-30 bg-emerald-600 hover:bg-emerald-700 text-white pl-4 pr-5 py-3.5 rounded-2xl shadow-fab flex items-center gap-2 font-display font-bold text-sm android-tap transition">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            <span>Catat Progres</span>
+        </button>
+
+        <!-- BOTTOM NAVIGATION BAR (Android Material 3 Style) -->
+        <nav class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-2 py-1.5 flex justify-around items-center">
+            <button onclick="switchTab('beranda')" id="nav-beranda" class="nav-btn flex flex-col items-center justify-center py-1 px-4 rounded-2xl text-emerald-700 transition">
+                <div class="nav-pill bg-emerald-100 px-4 py-1 rounded-full mb-0.5 transition">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                </div>
+                <span class="text-[11px] font-bold">Beranda</span>
+            </button>
+
+            <button onclick="switchTab('lahan')" id="nav-lahan" class="nav-btn flex flex-col items-center justify-center py-1 px-4 rounded-2xl text-slate-500 hover:text-slate-800 transition">
+                <div class="nav-pill bg-transparent px-4 py-1 rounded-full mb-0.5 transition">
+                    <i data-lucide="map" class="w-5 h-5"></i>
+                </div>
+                <span class="text-[11px] font-medium">Data Lahan</span>
+            </button>
+
+            <button onclick="switchTab('galeri')" id="nav-galeri" class="nav-btn flex flex-col items-center justify-center py-1 px-4 rounded-2xl text-slate-500 hover:text-slate-800 transition">
+                <div class="nav-pill bg-transparent px-4 py-1 rounded-full mb-0.5 transition">
+                    <i data-lucide="images" class="w-5 h-5"></i>
+                </div>
+                <span class="text-[11px] font-medium">Galeri Foto</span>
+            </button>
+        </nav>
+
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL / BOTTOM SHEET 1: TAMBAH / EDIT LAHAN                           -->
+    <!-- ===================================================================== -->
+    <div id="modal-lahan" class="fixed inset-0 z-50 sheet-hidden flex items-end justify-center">
+        <div onclick="closeLahanModal()" class="sheet-backdrop fixed inset-0 bg-slate-900/50 backdrop-blur-xs"></div>
+        <div class="sheet-content relative w-full max-w-md bg-white rounded-t-3xl p-5 shadow-sheet z-10 max-h-[90vh] overflow-y-auto">
+            <div class="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mb-4"></div>
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-lahan-title" class="font-display font-bold text-lg text-slate-800">Tambah Lahan Baru</h3>
+                <button onclick="closeLahanModal()" class="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="form-lahan" onsubmit="saveLahan(event)" class="space-y-4">
+                <input type="hidden" id="lahan-id">
+                
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Nama Lahan / Blok *</label>
+                    <input type="text" id="lahan-nama" required placeholder="Contoh: Blok A - Kebun Timur" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <div class="grid grid-cols-3 gap-2.5">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Luas Lahan *</label>
+                        <input type="number" step="any" min="1" id="lahan-luas" required placeholder="Contoh: 1500" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Satuan</label>
+                        <select id="lahan-satuan" class="w-full px-3 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                            <option value="m²">m²</option>
+                            <option value="Hektar">Hektar</option>
+                            <option value="Bata">Bata / Tumbak</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Status Lahan</label>
+                    <select id="lahan-status" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <option value="Aktif Tanam">🌱 Aktif Tanam</option>
+                        <option value="Persiapan Lahan">🚜 Persiapan Lahan</option>
+                        <option value="Siap Panen">🌾 Siap Panen</option>
+                        <option value="Istirahat / Pasca Panen">⏸️ Istirahat / Pasca Panen</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Tanggal Mulai Garap</label>
+                    <input type="date" id="lahan-tanggal-mulai" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Lokasi & Catatan Tanah</label>
+                    <textarea id="lahan-lokasi" rows="2" placeholder="Contoh: Desa Mekarsari, dekat irigasi sungai, tanah gembur..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+                </div>
+
+                <div class="pt-2 flex gap-2.5">
+                    <button type="button" onclick="closeLahanModal()" class="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:bg-slate-50">Batal</button>
+                    <button type="submit" class="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 shadow-sm android-tap">Simpan Lahan</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL / BOTTOM SHEET 2: CATAT / EDIT PROGRES BUDIDAYA                 -->
+    <!-- ===================================================================== -->
+    <div id="modal-progres" class="fixed inset-0 z-50 sheet-hidden flex items-end justify-center">
+        <div onclick="closeProgresModal()" class="sheet-backdrop fixed inset-0 bg-slate-900/50 backdrop-blur-xs"></div>
+        <div class="sheet-content relative w-full max-w-md bg-white rounded-t-3xl p-5 shadow-sheet z-10 max-h-[92vh] overflow-y-auto">
+            <div class="w-10 h-1.5 bg-slate-200 rounded-full mx-auto mb-3"></div>
+            <div class="flex items-center justify-between mb-4">
+                <h3 id="modal-progres-title" class="font-display font-bold text-lg text-slate-800">Catat Progres Budidaya</h3>
+                <button onclick="closeProgresModal()" class="p-1.5 rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <form id="form-progres" onsubmit="saveProgres(event)" class="space-y-4">
+                <input type="hidden" id="progres-id">
+
+                <!-- Pilih Lahan -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Pilih Lahan *</label>
+                    <select id="progres-lahan-id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm bg-white font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                        <!-- Options injected via JS -->
+                    </select>
+                </div>
+
+                <!-- Pilih Tahapan Budidaya (Visual Grid Selector + Hidden Select) -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Pilih Tahapan Budidaya *</label>
+                    <input type="hidden" id="progres-kategori" value="bibit">
+                    <div id="stage-selector-grid" class="grid grid-cols-3 gap-1.5">
+                        <button type="button" onclick="selectProgresStage('bibit')" data-selstage="bibit" class="stage-sel-btn p-2 rounded-xl border text-left transition">
+                            <span class="block text-[10px] font-bold opacity-75">Tahap 1</span>
+                            <span class="block text-xs font-bold truncate">🌱 Bibit</span>
+                        </button>
+                        <button type="button" onclick="selectProgresStage('tanam')" data-selstage="tanam" class="stage-sel-btn p-2 rounded-xl border text-left transition">
+                            <span class="block text-[10px] font-bold opacity-75">Tahap 2</span>
+                            <span class="block text-xs font-bold truncate">🚜 Tanam</span>
+                        </button>
+                        <button type="button" onclick="selectProgresStage('pupuk_awal')" data-selstage="pupuk_awal" class="stage-sel-btn p-2 rounded-xl border text-left transition">
+                            <span class="block text-[10px] font-bold opacity-75">Tahap 3</span>
+                            <span class="block text-xs font-bold truncate">🧪 Pupuk Awal</span>
+                        </button>
+                        <button type="button" onclick="selectProgresStage('pemeliharaan')" data-selstage="pemeliharaan" class="stage-sel-btn p-2 rounded-xl border text-left transition">
+                            <span class="block text-[10px] font-bold opacity-75">Tahap 4</span>
+                            <span class="block text-xs font-bold truncate">🌿 Rawat</span>
+                        </button>
+                        <button type="button" onclick="selectProgresStage('pupuk_susulan')" data-selstage="pupuk_susulan" class="stage-sel-btn p-2 rounded-xl border text-left transition">
+                            <span class="block text-[10px] font-bold opacity-75">Tahap 5</span>
+                            <span class="block text-xs font-bold truncate">⚡ Susulan</span>
+                        </button>
+                        <button type="button" onclick="selectProgresStage('panen')" data-selstage="panen" class="stage-sel-btn p-2 rounded-xl border text-left transition">
+                            <span class="block text-[10px] font-bold opacity-75">Tahap 6</span>
+                            <span class="block text-xs font-bold truncate">🌾 Panen</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tanggal Kegiatan -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Tanggal Kegiatan *</label>
+                    <input type="date" id="progres-tanggal" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <!-- DYNAMIC FORM FIELDS BASED ON STAGE -->
+                <div id="dynamic-progres-fields" class="bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 space-y-3">
+                    <!-- Injected via JS based on kategori -->
+                </div>
+
+                <!-- Catatan Tambahan -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Catatan Lapangan</label>
+                    <textarea id="progres-catatan" rows="2" placeholder="Tuliskan detail kondisi tanaman, cuaca, atau kendala di lapangan..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+                </div>
+
+                <!-- AREA UNGGAH MULTI-FOTO KHUSUS PER TAHAPAN -->
+                <div class="bg-emerald-50/70 border-2 border-dashed border-emerald-300 rounded-2xl p-3.5 space-y-2.5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <label id="foto-stage-title" class="block text-xs font-bold text-emerald-950">📸 Foto Dokumentasi Bibit & Penyemaian</label>
+                            <p id="foto-stage-hint" class="text-[11px] text-emerald-700 mt-0.5">Unggah 1 atau beberapa foto kondisi bibit stek sebelum ditanam</p>
+                        </div>
+                        <span id="foto-counter-pill" class="shrink-0 text-[10px] font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full">0 Foto</span>
+                    </div>
+
+                    <!-- Hidden File Inputs: Camera & Multi-Gallery -->
+                    <input type="file" id="progres-camera-input" accept="image/*" capture="environment" onchange="handleMultiPhotoUpload(event)" class="hidden">
+                    <input type="file" id="progres-gallery-input" accept="image/*" multiple onchange="handleMultiPhotoUpload(event)" class="hidden">
+
+                    <!-- Multi-Photo Preview Grid -->
+                    <div id="foto-multi-grid" class="hidden grid grid-cols-2 gap-2.5 pt-1">
+                        <!-- Photo items with caption & delete injected via JS -->
+                    </div>
+
+                    <!-- Dual Action Buttons: Camera & Gallery -->
+                    <div class="grid grid-cols-2 gap-2 pt-0.5">
+                        <button type="button" onclick="document.getElementById('progres-camera-input').click()" class="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-xs flex items-center justify-center gap-1.5 android-tap">
+                            <i data-lucide="camera" class="w-4 h-4"></i>
+                            <span>Ambil Foto</span>
+                        </button>
+                        <button type="button" onclick="document.getElementById('progres-gallery-input').click()" class="py-2.5 px-3 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-semibold shadow-2xs flex items-center justify-center gap-1.5 android-tap">
+                            <i data-lucide="images" class="w-4 h-4"></i>
+                            <span>Pilih Galeri</span>
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-slate-500 text-center">Bisa unggah lebih dari 1 foto per tahapan (otomatis dikompresi)</p>
+                </div>
+
+                <div class="pt-2 flex gap-2.5">
+                    <button type="button" onclick="closeProgresModal()" class="flex-1 py-3 rounded-xl border border-slate-300 text-slate-700 font-semibold text-sm hover:bg-slate-50">Batal</button>
+                    <button type="submit" class="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 shadow-sm android-tap">Simpan Progres</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 3: LIGHTBOX VIEWER FOTO FULLSCREEN                              -->
+    <!-- ===================================================================== -->
+    <div id="modal-lightbox" onclick="closeLightbox()" class="fixed inset-0 z-50 bg-black/90 hidden flex-col items-center justify-center p-4">
+        <button onclick="closeLightbox()" class="absolute top-4 right-4 bg-white/15 text-white p-2.5 rounded-full hover:bg-white/25">
+            <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+        <img id="lightbox-img" src="" alt="Foto Progres" class="max-w-full max-h-[75vh] rounded-2xl object-contain shadow-2xl" onclick="event.stopPropagation()">
+        <div id="lightbox-caption" class="mt-4 text-center text-white max-w-md" onclick="event.stopPropagation()">
+            <!-- Caption injected -->
+        </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- MODAL 4: CUSTOM CONFIRMATION DIALOG (Pengganti window.confirm)        -->
+    <!-- ===================================================================== -->
+    <div id="modal-confirm" class="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs hidden items-center justify-center p-4">
+        <div class="bg-white rounded-3xl max-w-xs w-full p-5 shadow-2xl space-y-4">
+            <div class="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+                <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+            </div>
+            <div class="text-center">
+                <h4 id="confirm-title" class="font-display font-bold text-base text-slate-800">Konfirmasi Hapus</h4>
+                <p id="confirm-desc" class="text-xs text-slate-500 mt-1">Apakah Anda yakin ingin menghapus data ini?</p>
+            </div>
+            <div class="flex gap-2.5 pt-1">
+                <button onclick="closeConfirmDialog()" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50">Batal</button>
+                <button id="confirm-yes-btn" class="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-xs font-semibold hover:bg-red-700">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT APPLICATION LOGIC -->
+    <script>
+        // =========================================================================
+        // 1. STATE & CONSTANTS
+        // =========================================================================
+        const STORAGE_KEY_LAHAN = 'odottrack_lahan_v2';
+        const STORAGE_KEY_PROGRES = 'odottrack_progres_v2';
+
+        let state = {
+            lahanList: [],
+            progresList: [],
+            activeLahanId: 'ALL',
+            activeStageFilter: 'ALL',
+            activeGaleriStageFilter: 'ALL',
+            activeTab: 'beranda',
+            // Array of { src: base64String, caption: string }
+            currentUploadedPhotos: []
+        };
+
+        // Metadata lengkap untuk tiap tahapan budidaya termasuk panduan foto khusus
+        const STAGE_META = {
+            bibit: {
+                step: 1,
+                shortLabel: 'Bibit',
+                label: 'Bibit & Sumber',
+                photoTitle: '📸 Foto Bibit & Penyemaian',
+                photoHint: 'Foto tumpukan stek bibit, mata tunas, atau bukti pembelian bibit',
+                badgeClass: 'bg-lime-100 text-lime-800 border-lime-200',
+                icon: 'sprout',
+                color: '#65a30d'
+            },
+            tanam: {
+                step: 2,
+                shortLabel: 'Penanaman',
+                label: 'Periode Penanaman',
+                photoTitle: '📸 Foto Proses & Hasil Tanam',
+                photoHint: 'Foto bedengan/larikan tanam, jarak tanam, dan proses penanaman bibit',
+                badgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+                icon: 'shovel',
+                color: '#059669'
+            },
+            pupuk_awal: {
+                step: 3,
+                shortLabel: 'Pupuk Awal',
+                label: 'Pemupukan Awal',
+                photoTitle: '📸 Foto Pemupukan Awal (Dasar)',
+                photoHint: 'Foto karung pupuk dasar/kohe & dokumentasi penebaran di lahan',
+                badgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+                icon: 'package-plus',
+                color: '#d97706'
+            },
+            pemeliharaan: {
+                step: 4,
+                shortLabel: 'Pemeliharaan',
+                label: 'Pemeliharaan',
+                photoTitle: '📸 Foto Perkembangan Tanaman',
+                photoHint: 'Foto tinggi rumput, kondisi daun, penyiangan gulma, atau penyiraman',
+                badgeClass: 'bg-sky-100 text-sky-800 border-sky-200',
+                icon: 'heart-pulse',
+                color: '#0284c7'
+            },
+            pupuk_susulan: {
+                step: 5,
+                shortLabel: 'Pupuk Susulan',
+                label: 'Pemupukan Susulan',
+                photoTitle: '📸 Foto Pemupukan Susulan',
+                photoHint: 'Foto aplikasi pupuk susulan & kondisi rumpun sebelum/sesudah pemupukan',
+                badgeClass: 'bg-purple-100 text-purple-800 border-purple-200',
+                icon: 'zap',
+                color: '#7c3aed'
+            },
+            panen: {
+                step: 6,
+                shortLabel: 'Panen',
+                label: 'Waktu & Hasil Panen',
+                photoTitle: '📸 Foto Hasil Panen Rumput Odot',
+                photoHint: 'Foto rumpun siap potong, hasil ikatan panen, atau penimbangan bobot',
+                badgeClass: 'bg-orange-100 text-orange-800 border-orange-200',
+                icon: 'wheat',
+                color: '#ea580c'
+            }
+        };
+
+        const STAGE_KEYS = ['bibit', 'tanam', 'pupuk_awal', 'pemeliharaan', 'pupuk_susulan', 'panen'];
+
+        // Helper untuk menormalisasi foto (kompatibel baik single string lama maupun array multi-foto)
+        function normalizePhotos(item) {
+            if (Array.isArray(item.fotos) && item.fotos.length > 0) {
+                return item.fotos.map(f => typeof f === 'string' ? { src: f, caption: '' } : f);
+            }
+            if (item.foto && typeof item.foto === 'string' && item.foto.length > 0) {
+                return [{ src: item.foto, caption: '' }];
+            }
+            return [];
+        }
+
+        // Helper untuk membuat ilustrasi SVG placeholder Base64 yang ringan untuk Dummy Data
+        function createDummySvgPhoto(title, subtitle, bgColor1, bgColor2) {
+            const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="360" viewBox="0 0 600 360">
+                <defs>
+                    <linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="${bgColor1}"/>
+                        <stop offset="100%" stop-color="${bgColor2}"/>
+                    </linearGradient>
+                </defs>
+                <rect width="600" height="360" fill="url(#g)"/>
+                <circle cx="510" cy="70" r="90" fill="rgba(255,255,255,0.08)"/>
+                <path d="M0 290 Q 150 240 300 285 T 600 265 L 600 360 L 0 360 Z" fill="rgba(0,0,0,0.18)"/>
+                <text x="32" y="295" font-family="sans-serif" font-weight="bold" font-size="24" fill="#ffffff">${title}</text>
+                <text x="32" y="325" font-family="sans-serif" font-size="15" fill="rgba(255,255,255,0.85)">${subtitle}</text>
+            </svg>`;
+            return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+        }
+
+        // =========================================================================
+        // 2. INITIALIZATION & DUMMY DATA
+        // =========================================================================
+        function initApp() {
+            const savedLahan = localStorage.getItem(STORAGE_KEY_LAHAN);
+            const savedProgres = localStorage.getItem(STORAGE_KEY_PROGRES);
+
+            if (savedLahan && savedProgres) {
+                try {
+                    state.lahanList = JSON.parse(savedLahan);
+                    state.progresList = JSON.parse(savedProgres);
+                } catch (e) {
+                    seedDummyData();
+                }
+            } else {
+                seedDummyData();
+            }
+
+            renderAll();
+            lucide.createIcons();
+        }
+
+        function seedDummyData() {
+            const dummyLahan = [
+                {
+                    id: 'lahan-1',
+                    nama: 'Blok A - Kebun Timur',
+                    luas: 1200,
+                    satuan: 'm²',
+                    status: 'Siap Panen',
+                    tanggalMulai: '2026-09-01',
+                    lokasi: 'Desa Sukamaju, dekat saluran irigasi, tanah lempung gembur.'
+                },
+                {
+                    id: 'lahan-2',
+                    nama: 'Blok B - Lahan Kandang',
+                    luas: 800,
+                    satuan: 'm²',
+                    status: 'Aktif Tanam',
+                    tanggalMulai: '2026-10-25',
+                    lokasi: 'Belakang kandang sapi, akses pupuk kandang mudah.'
+                }
+            ];
+
+            const dummyProgres = [
+                {
+                    id: 'prog-101',
+                    lahanId: 'lahan-1',
+                    kategori: 'bibit',
+                    tanggal: '2026-09-01',
+                    details: {
+                        jumlahBibit: 2400,
+                        satuanBibit: 'Stek',
+                        sumberAsal: 'Beli',
+                        detailSumber: 'Penangkar Bibit Ciamis (Rp 350/stek, kondisi 2-3 mata tunas)'
+                    },
+                    catatan: 'Bibit segar sudah disortir dan didiamkan 2 hari di tempat teduh sebelum tanam.',
+                    fotos: [
+                        {
+                            src: createDummySvgPhoto('Tahap 1: 2.400 Stek Bibit', 'Sumber: Beli Unggul • 2-3 Mata Tunas', '#3f6212', '#65a30d'),
+                            caption: 'Kondisi stek bibit saat tiba di lokasi'
+                        },
+                        {
+                            src: createDummySvgPhoto('Sortir & Pemeraman Tunas', 'Disimpan teduh 2 hari sebelum tanam', '#4d7c0f', '#84cc16'),
+                            caption: 'Mata tunas mulai muncul setelah pemeraman'
+                        }
+                    ]
+                },
+                {
+                    id: 'prog-102',
+                    lahanId: 'lahan-1',
+                    kategori: 'tanam',
+                    tanggal: '2026-09-04',
+                    details: {
+                        jarakTanam: '60 cm x 40 cm',
+                        metodeTanam: 'Miring 45 Derajat',
+                        tenagaKerja: 3
+                    },
+                    catatan: 'Cuaca mendung gerimis, kelembaban tanah sangat ideal untuk penanaman awal.',
+                    fotos: [
+                        {
+                            src: createDummySvgPhoto('Tahap 2: Penanaman Blok A', 'Jarak Tanam 60x40 cm • 3 Tenaga Kerja', '#065f46', '#059669'),
+                            caption: 'Alur tanam miring 45 derajat di Blok A'
+                        }
+                    ]
+                },
+                {
+                    id: 'prog-103',
+                    lahanId: 'lahan-1',
+                    kategori: 'pupuk_awal',
+                    tanggal: '2026-09-05',
+                    details: {
+                        jenisPupuk: 'Pupuk Kandang Sapi Fermentasi + Dolomit',
+                        dosisKg: 450,
+                        caraAplikasi: 'Tebar di Larikan Tanam'
+                    },
+                    catatan: 'Ditebar merata di larikan tanam untuk memperbaiki struktur dan pH tanah.',
+                    fotos: [
+                        {
+                            src: createDummySvgPhoto('Tahap 3: Pupuk Awal 450 Kg', 'Kohe Sapi Fermentasi + Dolomit', '#92400e', '#d97706'),
+                            caption: 'Penebaran pupuk kandang matang di pangkal tanam'
+                        }
+                    ]
+                },
+                {
+                    id: 'prog-104',
+                    lahanId: 'lahan-1',
+                    kategori: 'pemeliharaan',
+                    tanggal: '2026-10-05',
+                    details: {
+                        umurHst: 31,
+                        tinggiCm: 85,
+                        kegiatan: 'Penyiangan Gulma & Pembumbunan',
+                        kondisi: 'Subur (Hijau Pekat, 8-12 Anakan/Rumpun)'
+                    },
+                    catatan: 'Umur 31 HST, rata-rata 1 rumpun tumbuh 8-12 anakan baru. Tidak ada serangan hama.',
+                    fotos: [
+                        {
+                            src: createDummySvgPhoto('Tahap 4: Umur 31 HST (85 cm)', 'Penyiangan Gulma & Pembumbunan Pangkal', '#0369a1', '#0284c7'),
+                            caption: 'Pertumbuhan tunas usia 1 bulan sangat rapat'
+                        }
+                    ]
+                },
+                {
+                    id: 'prog-105',
+                    lahanId: 'lahan-1',
+                    kategori: 'pupuk_susulan',
+                    tanggal: '2026-10-08',
+                    details: {
+                        susulanKe: 1,
+                        jenisPupuk: 'Urea + NPK Phonska (2:1)',
+                        dosisKg: 35
+                    },
+                    catatan: 'Pemupukan susulan memacu pertumbuhan daun dan batang agar lebih tebal dan manis.',
+                    fotos: [
+                        {
+                            src: createDummySvgPhoto('Tahap 5: Pupuk Susulan Ke-1', 'Urea + NPK Phonska • Dosis 35 Kg', '#5b21b6', '#7c3aed'),
+                            caption: 'Aplikasi pupuk susulan setelah pembumbunan'
+                        }
+                    ]
+                },
+                {
+                    id: 'prog-106',
+                    lahanId: 'lahan-1',
+                    kategori: 'panen',
+                    tanggal: '2026-11-12',
+                    details: {
+                        panenKe: 1,
+                        hasilKg: 3850,
+                        umurPanenHari: 69,
+                        estimasiNilai: 'Rp 2.695.000 (Pakan Ternak)'
+                    },
+                    catatan: 'Panen perdana dipotong 5-10 cm dari permukaan tanah agar tunas baru cepat tumbuh.',
+                    fotos: [
+                        {
+                            src: createDummySvgPhoto('Tahap 6: Panen Perdana 3.850 Kg', 'Umur 69 Hari • Tinggi 155 cm', '#9a3412', '#ea580c'),
+                            caption: 'Kondisi rumput odot rimbun sebelum dipangkas'
+                        },
+                        {
+                            src: createDummySvgPhoto('Hasil Ikatan & Penimbangan', 'Total 3,85 Ton Hijauan Segar', '#7c2d12', '#c2410c'),
+                            caption: 'Tumpukan hasil panen siap dicacah untuk pakan'
+                        }
+                    ]
+                },
+                {
+                    id: 'prog-201',
+                    lahanId: 'lahan-2',
+                    kategori: 'bibit',
+                    tanggal: '2026-10-25',
+                    details: {
+                        jumlahBibit: 1500,
+                        satuanBibit: 'Stek',
+                        sumberAsal: 'Stek Sendiri',
+                        detailSumber: 'Hasil pemangkasan indukan Blok A yang sudah tua'
+                    },
+                    catatan: 'Hemat biaya bibit karena menggunakan batang bawah dari Blok A.',
+                    fotos: [
+                        {
+                            src: createDummySvgPhoto('Tahap 1: 1.500 Stek Sendiri', 'Sumber: Indukan Blok A', '#3f6212', '#65a30d'),
+                            caption: 'Pemotongan stek bibit dari indukan Blok A'
+                        }
+                    ]
+                }
+            ];
+
+            state.lahanList = dummyLahan;
+            state.progresList = dummyProgres;
+            persistData();
+        }
+
+        function persistData() {
+            localStorage.setItem(STORAGE_KEY_LAHAN, JSON.stringify(state.lahanList));
+            localStorage.setItem(STORAGE_KEY_PROGRES, JSON.stringify(state.progresList));
+        }
+
+        // =========================================================================
+        // 3. UI RENDERING FUNCTIONS
+        // =========================================================================
+        function renderAll() {
+            renderLahanDropdown();
+            renderDashboardStats();
+            renderStageChecklist();
+            renderTimeline();
+            renderLahanList();
+            renderGaleri();
+            lucide.createIcons();
+        }
+
+        function renderLahanDropdown() {
+            const select = document.getElementById('active-lahan-select');
+            const currentVal = state.activeLahanId;
+            
+            let html = `<option value="ALL">Semua Lahan (${state.lahanList.length} Lokasi)</option>`;
+            state.lahanList.forEach(lahan => {
+                html += `<option value="${lahan.id}">${lahan.nama} (${lahan.luas} ${lahan.satuan})</option>`;
+            });
+            select.innerHTML = html;
+            select.value = currentVal;
+        }
+
+        function renderDashboardStats() {
+            // Filter berdasarkan lahan aktif jika dipilih
+            const filteredLahan = state.activeLahanId === 'ALL' 
+                ? state.lahanList 
+                : state.lahanList.filter(l => l.id === state.activeLahanId);
+            
+            const filteredProgres = state.activeLahanId === 'ALL'
+                ? state.progresList
+                : state.progresList.filter(p => p.lahanId === state.activeLahanId);
+
+            // Hitung Total Lahan & Luas
+            document.getElementById('stat-lahan').textContent = `${filteredLahan.length} Lahan`;
+            
+            // Konversi sederhana ke m² untuk ringkasan luas
+            let totalM2 = 0;
+            filteredLahan.forEach(l => {
+                const val = parseFloat(l.luas) || 0;
+                if (l.satuan === 'Hektar') totalM2 += val * 10000;
+                else if (l.satuan === 'Bata') totalM2 += val * 14;
+                else totalM2 += val;
+            });
+            document.getElementById('stat-luas').textContent = totalM2 >= 10000 
+                ? `${(totalM2 / 10000).toFixed(2)} Ha` 
+                : `${totalM2.toLocaleString('id-ID')} m²`;
+
+            // Hitung Total Bibit
+            const totalBibit = filteredProgres
+                .filter(p => p.kategori === 'bibit')
+                .reduce((sum, p) => sum + (parseFloat(p.details?.jumlahBibit) || 0), 0);
+            document.getElementById('stat-bibit').textContent = totalBibit.toLocaleString('id-ID');
+
+            // Hitung Total Panen
+            const totalPanenKg = filteredProgres
+                .filter(p => p.kategori === 'panen')
+                .reduce((sum, p) => sum + (parseFloat(p.details?.hasilKg) || 0), 0);
+            document.getElementById('stat-panen').textContent = `${totalPanenKg.toLocaleString('id-ID')} kg`;
+            document.getElementById('stat-panen-ton').textContent = `${(totalPanenKg / 1000).toFixed(2)} Ton`;
+        }
+
+        function renderStageChecklist() {
+            const container = document.getElementById('stage-checklist-grid');
+            const subtitle = document.getElementById('checklist-subtitle');
+            const progressText = document.getElementById('checklist-progress-text');
+
+            const filteredProgres = state.activeLahanId === 'ALL'
+                ? state.progresList
+                : state.progresList.filter(p => p.lahanId === state.activeLahanId);
+
+            if (state.activeLahanId === 'ALL') {
+                subtitle.textContent = 'Menampilkan status gabungan semua lahan';
+            } else {
+                const l = state.lahanList.find(item => item.id === state.activeLahanId);
+                subtitle.textContent = l ? `Status tahapan untuk ${l.nama}` : 'Ketuk tahapan untuk mencatat + foto';
+            }
+
+            let completedStages = 0;
+
+            container.innerHTML = STAGE_KEYS.map(key => {
+                const meta = STAGE_META[key];
+                const logs = filteredProgres.filter(p => p.kategori === key);
+                const hasLog = logs.length > 0;
+                if (hasLog) completedStages++;
+
+                const totalPhotosInStage = logs.reduce((acc, log) => acc + normalizePhotos(log).length, 0);
+
+                return `
+                <button type="button" onclick="openProgresModal(null, '${key}')" class="p-2.5 rounded-2xl border text-left transition android-tap flex flex-col justify-between ${hasLog ? 'bg-emerald-50/70 border-emerald-200' : 'bg-slate-50 border-slate-200/80 hover:border-emerald-300'}">
+                    <div class="flex items-center justify-between w-full mb-1">
+                        <span class="text-[10px] font-bold ${hasLog ? 'text-emerald-700' : 'text-slate-400'}">Tahap ${meta.step}</span>
+                        ${totalPhotosInStage > 0 
+                            ? `<span class="inline-flex items-center gap-0.5 text-[9px] font-bold bg-emerald-600 text-white px-1.5 py-0.5 rounded-full"><i data-lucide="camera" class="w-2.5 h-2.5"></i>${totalPhotosInStage}</span>`
+                            : `<span class="inline-flex items-center text-[9px] font-semibold text-slate-400 bg-white px-1.5 py-0.5 rounded-full border border-slate-200">+ Foto</span>`
+                        }
+                    </div>
+                    <p class="text-[11px] font-bold ${hasLog ? 'text-slate-800' : 'text-slate-600'} truncate">${meta.shortLabel}</p>
+                    <p class="text-[9px] mt-0.5 ${hasLog ? 'text-emerald-700 font-medium' : 'text-slate-400'}">
+                        ${hasLog ? `${logs.length} catatan` : 'Belum dicatat'}
+                    </p>
+                </button>
+                `;
+            }).join('');
+
+            progressText.textContent = `${completedStages}/6 Tahap`;
+        }
+
+        function renderTimeline() {
+            const container = document.getElementById('timeline-container');
+            
+            // Filter by Lahan & Stage
+            let items = [...state.progresList];
+            if (state.activeLahanId !== 'ALL') {
+                items = items.filter(p => p.lahanId === state.activeLahanId);
+            }
+            if (state.activeStageFilter !== 'ALL') {
+                items = items.filter(p => p.kategori === state.activeStageFilter);
+            }
+
+            // Sort terbaru di atas
+            items.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+
+            document.getElementById('timeline-count-badge').textContent = `${items.length} Catatan`;
+
+            if (items.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-3xl p-8 text-center border border-slate-100 shadow-android">
+                        <div class="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                            <i data-lucide="clipboard-list" class="w-7 h-7"></i>
+                        </div>
+                        <h3 class="font-display font-bold text-sm text-slate-800">Belum Ada Catatan Progres</h3>
+                        <p class="text-xs text-slate-500 mt-1 max-w-[230px] mx-auto">Tekan tombol <b>"+ Catat Progres"</b> atau pilih salah satu dari 6 tahapan di atas untuk menambahkan catatan & foto.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = items.map(item => {
+                const meta = STAGE_META[item.kategori] || STAGE_META.pemeliharaan;
+                const lahan = state.lahanList.find(l => l.id === item.lahanId);
+                const lahanName = lahan ? lahan.nama : 'Lahan Terhapus';
+                const formattedDate = formatDateIndo(item.tanggal);
+                const detailsHtml = buildStageDetailsHtml(item.kategori, item.details);
+                const photos = normalizePhotos(item);
+
+                // Build Photo Grid HTML for 1 or multiple photos
+                let photosHtml = '';
+                if (photos.length === 1) {
+                    photosHtml = `
+                        <div onclick="openLightbox('${item.id}', 0)" class="relative group cursor-pointer overflow-hidden rounded-2xl border border-slate-200/70">
+                            <img src="${photos[0].src}" alt="Foto ${meta.label}" class="w-full h-44 object-cover group-hover:scale-103 transition duration-300">
+                            ${photos[0].caption ? `<div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent p-2.5 pt-6 text-white text-[11px] font-medium">${escapeHtml(photos[0].caption)}</div>` : ''}
+                            <div class="absolute top-2 right-2 bg-black/60 backdrop-blur-xs text-white text-[10px] font-medium px-2.5 py-1 rounded-full flex items-center gap-1">
+                                <i data-lucide="maximize-2" class="w-3 h-3"></i>
+                                <span>Perbesar</span>
+                            </div>
+                        </div>
+                    `;
+                } else if (photos.length > 1) {
+                    photosHtml = `
+                        <div class="grid grid-cols-2 gap-2">
+                            ${photos.map((p, idx) => `
+                                <div onclick="openLightbox('${item.id}', ${idx})" class="relative group cursor-pointer overflow-hidden rounded-2xl border border-slate-200/70 aspect-4/3 bg-slate-100">
+                                    <img src="${p.src}" alt="Foto ${idx + 1}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                                    <span class="absolute top-1.5 left-1.5 bg-black/60 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">Foto ${idx + 1}/${photos.length}</span>
+                                    ${p.caption ? `<div class="absolute bottom-0 inset-x-0 bg-black/65 text-white text-[10px] px-2 py-1 truncate">${escapeHtml(p.caption)}</div>` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+
+                return `
+                <article class="bg-white rounded-3xl p-4 shadow-android border border-slate-100 space-y-3 transition hover:border-emerald-200">
+                    <!-- Top Header: Badge & Date & Actions -->
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="space-y-1">
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${meta.badgeClass}">
+                                    <i data-lucide="${meta.icon}" class="w-3 h-3"></i>
+                                    ${meta.step}. ${meta.label}
+                                </span>
+                                <span class="text-[11px] font-medium text-slate-400">• ${formattedDate}</span>
+                            </div>
+                            <div class="flex items-center gap-1 text-xs font-semibold text-slate-700">
+                                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-emerald-600 shrink-0"></i>
+                                <span>${lahanName}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-1 shrink-0">
+                            <button onclick="openProgresModal('${item.id}')" title="Edit & Tambah Foto" class="p-1.5 rounded-xl text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="confirmDeleteProgres('${item.id}')" title="Hapus Catatan" class="p-1.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-red-50 transition">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Stage Specific Highlight Box -->
+                    <div class="bg-slate-50/90 rounded-2xl p-3 border border-slate-100 grid grid-cols-2 gap-2.5">
+                        ${detailsHtml}
+                    </div>
+
+                    <!-- Notes -->
+                    ${item.catatan ? `<p class="text-xs text-slate-600 leading-relaxed">${escapeHtml(item.catatan)}</p>` : ''}
+
+                    <!-- Progress Photo(s) -->
+                    ${photosHtml}
+
+                    <!-- Quick Add Photo button if no photo yet -->
+                    ${photos.length === 0 ? `
+                        <button type="button" onclick="openProgresModal('${item.id}')" class="w-full py-2 px-3 rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 hover:bg-emerald-50 text-emerald-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition">
+                            <i data-lucide="camera" class="w-3.5 h-3.5"></i>
+                            <span>+ Tambah Foto Tahapan Ini</span>
+                        </button>
+                    ` : ''}
+                </article>
+                `;
+            }).join('');
+        }
+
+        function buildStageDetailsHtml(kategori, d = {}) {
+            switch (kategori) {
+                case 'bibit':
+                    return `
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Jumlah Bibit</span>
+                            <span class="text-xs font-bold text-slate-800">${Number(d.jumlahBibit || 0).toLocaleString('id-ID')} ${escapeHtml(d.satuanBibit || 'Stek')}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Sumber Asal</span>
+                            <span class="text-xs font-bold ${d.sumberAsal === 'Beli' ? 'text-amber-700' : 'text-emerald-700'}">${escapeHtml(d.sumberAsal || '-')}</span>
+                        </div>
+                        ${d.detailSumber ? `
+                        <div class="col-span-2 pt-1 border-t border-slate-200/60">
+                            <span class="text-[10px] text-slate-400 block">Pemasok / Varietas / Harga</span>
+                            <span class="text-xs font-medium text-slate-700">${escapeHtml(d.detailSumber)}</span>
+                        </div>` : ''}
+                    `;
+                case 'tanam':
+                    return `
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Jarak Tanam</span>
+                            <span class="text-xs font-bold text-slate-800">${escapeHtml(d.jarakTanam || '-')}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Metode / Tenaga</span>
+                            <span class="text-xs font-bold text-emerald-700">${escapeHtml(d.metodeTanam || '-')}${d.tenagaKerja ? ` (${d.tenagaKerja} Org)` : ''}</span>
+                        </div>
+                    `;
+                case 'pupuk_awal':
+                    return `
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Jenis Pupuk Dasar</span>
+                            <span class="text-xs font-bold text-slate-800">${escapeHtml(d.jenisPupuk || '-')}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Dosis & Aplikasi</span>
+                            <span class="text-xs font-bold text-amber-700">${Number(d.dosisKg || 0).toLocaleString('id-ID')} kg${d.caraAplikasi ? ` • ${escapeHtml(d.caraAplikasi)}` : ''}</span>
+                        </div>
+                    `;
+                case 'pupuk_susulan':
+                    return `
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Pemupukan Ke-${d.susulanKe || 1}</span>
+                            <span class="text-xs font-bold text-slate-800">${escapeHtml(d.jenisPupuk || '-')}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Dosis / Takaran</span>
+                            <span class="text-xs font-bold text-purple-700">${Number(d.dosisKg || 0).toLocaleString('id-ID')} kg</span>
+                        </div>
+                    `;
+                case 'pemeliharaan':
+                    return `
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Tinggi / Umur</span>
+                            <span class="text-xs font-bold text-sky-700">${Number(d.tinggiCm || 0)} cm ${d.umurHst ? `(${d.umurHst} HST)` : ''}</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Kegiatan Perawatan</span>
+                            <span class="text-xs font-bold text-slate-800">${escapeHtml(d.kegiatan || '-')}</span>
+                        </div>
+                        ${d.kondisi ? `
+                        <div class="col-span-2 pt-1 border-t border-slate-200/60">
+                            <span class="text-[10px] text-slate-400 block">Kondisi Kesehatan Tanaman</span>
+                            <span class="text-xs font-medium text-emerald-700">${escapeHtml(d.kondisi)}</span>
+                        </div>` : ''}
+                    `;
+                case 'panen':
+                    return `
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Total Bobot Panen</span>
+                            <span class="text-xs font-bold text-orange-700">${Number(d.hasilKg || 0).toLocaleString('id-ID')} kg (${(Number(d.hasilKg || 0)/1000).toFixed(2)} Ton)</span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Panen Ke / Umur</span>
+                            <span class="text-xs font-bold text-slate-800">Panen ke-${d.panenKe || 1} (${d.umurPanenHari || '-'} hari)</span>
+                        </div>
+                        ${d.estimasiNilai ? `
+                        <div class="col-span-2 pt-1 border-t border-slate-200/60">
+                            <span class="text-[10px] text-slate-400 block">Estimasi Nilai / Peruntukan</span>
+                            <span class="text-xs font-medium text-slate-700">${escapeHtml(d.estimasiNilai)}</span>
+                        </div>` : ''}
+                    `;
+                default:
+                    return '';
+            }
+        }
+
+        function renderLahanList() {
+            const container = document.getElementById('lahan-list-container');
+            
+            if (state.lahanList.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white rounded-3xl p-8 text-center border border-slate-100">
+                        <p class="text-sm font-semibold text-slate-700">Belum ada lahan terdaftar</p>
+                        <p class="text-xs text-slate-400 mt-1">Tambahkan data lahan pertama Anda untuk memulai.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = state.lahanList.map(lahan => {
+                const countLogs = state.progresList.filter(p => p.lahanId === lahan.id).length;
+                const totalPanenLahan = state.progresList
+                    .filter(p => p.lahanId === lahan.id && p.kategori === 'panen')
+                    .reduce((acc, cur) => acc + (parseFloat(cur.details?.hasilKg) || 0), 0);
+
+                return `
+                <div class="bg-white rounded-3xl p-4 shadow-android border border-slate-100 space-y-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <span class="inline-block text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 mb-1">
+                                ${escapeHtml(lahan.status)}
+                            </span>
+                            <h3 class="font-display font-bold text-base text-slate-800">${escapeHtml(lahan.nama)}</h3>
+                        </div>
+                        <div class="flex gap-1">
+                            <button onclick="openLahanModal('${lahan.id}')" class="p-2 rounded-xl bg-slate-50 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50">
+                                <i data-lucide="pencil" class="w-4 h-4"></i>
+                            </button>
+                            <button onclick="confirmDeleteLahan('${lahan.id}')" class="p-2 rounded-xl bg-slate-50 text-slate-500 hover:text-red-600 hover:bg-red-50">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="text-xs text-slate-500 flex items-start gap-1.5">
+                        <i data-lucide="map-pin" class="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5"></i>
+                        <span>${escapeHtml(lahan.lokasi || 'Tidak ada catatan lokasi')}</span>
+                    </p>
+
+                    <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 text-center">
+                        <div class="bg-slate-50 rounded-xl py-2 px-1">
+                            <span class="text-[10px] text-slate-400 block">Luas Lahan</span>
+                            <span class="text-xs font-bold text-slate-800">${lahan.luas} ${lahan.satuan}</span>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl py-2 px-1">
+                            <span class="text-[10px] text-slate-400 block">Log Aktivitas</span>
+                            <span class="text-xs font-bold text-emerald-700">${countLogs} Catatan</span>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl py-2 px-1">
+                            <span class="text-[10px] text-slate-400 block">Total Panen</span>
+                            <span class="text-xs font-bold text-orange-700">${totalPanenLahan.toLocaleString('id-ID')} kg</span>
+                        </div>
+                    </div>
+
+                    <button onclick="selectLahanAndGoHome('${lahan.id}')" class="w-full py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs transition flex items-center justify-center gap-1.5">
+                        <span>Lihat Timeline Lahan Ini</span>
+                        <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function renderGaleri() {
+            const container = document.getElementById('galeri-container');
+            const badge = document.getElementById('galeri-count-badge');
+            
+            // Flatten all photos across filtered logs
+            let allPhotos = [];
+            state.progresList.forEach(item => {
+                if (state.activeLahanId !== 'ALL' && item.lahanId !== state.activeLahanId) return;
+                if (state.activeGaleriStageFilter !== 'ALL' && item.kategori !== state.activeGaleriStageFilter) return;
+
+                const photos = normalizePhotos(item);
+                photos.forEach((p, idx) => {
+                    allPhotos.push({
+                        progresId: item.id,
+                        photoIndex: idx,
+                        src: p.src,
+                        caption: p.caption,
+                        kategori: item.kategori,
+                        lahanId: item.lahanId,
+                        tanggal: item.tanggal
+                    });
+                });
+            });
+
+            allPhotos.sort((a, b) => new Date(b.tanggal) - new Date(a.tanggal));
+            badge.textContent = `${allPhotos.length} Foto`;
+
+            if (allPhotos.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-2 bg-white rounded-3xl p-8 text-center border border-slate-100">
+                        <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-2xl flex items-center justify-center mx-auto mb-2">
+                            <i data-lucide="image-off" class="w-6 h-6"></i>
+                        </div>
+                        <p class="text-sm font-semibold text-slate-700">Belum Ada Foto di Filter Ini</p>
+                        <p class="text-xs text-slate-400 mt-1">Unggah foto pada setiap tahapan budidaya untuk memantau pertumbuhan secara visual.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = allPhotos.map(p => {
+                const meta = STAGE_META[p.kategori] || STAGE_META.pemeliharaan;
+                const lahan = state.lahanList.find(l => l.id === p.lahanId);
+                return `
+                <div onclick="openLightbox('${p.progresId}', ${p.photoIndex})" class="bg-white rounded-2xl overflow-hidden shadow-android border border-slate-100 cursor-pointer group">
+                    <div class="relative aspect-4/3 overflow-hidden bg-slate-100">
+                        <img src="${p.src}" alt="${meta.label}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                        <span class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold bg-black/65 text-white backdrop-blur-xs">
+                            ${meta.step}. ${meta.shortLabel}
+                        </span>
+                    </div>
+                    <div class="p-2.5">
+                        <p class="text-[11px] font-bold text-slate-800 truncate">${p.caption ? escapeHtml(p.caption) : (lahan ? lahan.nama : 'Lahan')}</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5 truncate">${lahan ? lahan.nama : ''} • ${formatDateIndo(p.tanggal)}</p>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        // =========================================================================
+        // 4. NAVIGATION & FILTER HANDLERS
+        // =========================================================================
+        function switchTab(tabName) {
+            state.activeTab = tabName;
+            
+            // Hide all sections
+            ['beranda', 'lahan', 'galeri'].forEach(t => {
+                document.getElementById(`view-${t}`).classList.add('hidden');
+                const navBtn = document.getElementById(`nav-${t}`);
+                const pill = navBtn.querySelector('.nav-pill');
+                const label = navBtn.querySelector('span');
+                
+                if (t === tabName) {
+                    navBtn.classList.remove('text-slate-500');
+                    navBtn.classList.add('text-emerald-700');
+                    pill.classList.remove('bg-transparent');
+                    pill.classList.add('bg-emerald-100');
+                    label.classList.replace('font-medium', 'font-bold');
+                } else {
+                    navBtn.classList.add('text-slate-500');
+                    navBtn.classList.remove('text-emerald-700');
+                    pill.classList.add('bg-transparent');
+                    pill.classList.remove('bg-emerald-100');
+                    label.classList.replace('font-bold', 'font-medium');
+                }
+            });
+
+            document.getElementById(`view-${tabName}`).classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function handleLahanFilterChange(lahanId) {
+            state.activeLahanId = lahanId;
+            renderAll();
+        }
+
+        function selectLahanAndGoHome(lahanId) {
+            state.activeLahanId = lahanId;
+            document.getElementById('active-lahan-select').value = lahanId;
+            renderAll();
+            switchTab('beranda');
+        }
+
+        function setStageFilter(stage) {
+            state.activeStageFilter = stage;
+            document.querySelectorAll('.stage-chip').forEach(btn => {
+                if (btn.dataset.stage === stage) {
+                    btn.className = 'stage-chip active shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-700 text-white shadow-sm transition';
+                } else {
+                    btn.className = 'stage-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition';
+                }
+            });
+            renderTimeline();
+            lucide.createIcons();
+        }
+
+        function setGaleriStageFilter(stage) {
+            state.activeGaleriStageFilter = stage;
+            document.querySelectorAll('.gstage-chip').forEach(btn => {
+                if (btn.dataset.gstage === stage) {
+                    btn.className = 'gstage-chip active shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-700 text-white shadow-sm transition';
+                } else {
+                    btn.className = 'gstage-chip shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition';
+                }
+            });
+            renderGaleri();
+            lucide.createIcons();
+        }
+
+        // =========================================================================
+        // 5. LAHAN CRUD & MODAL
+        // =========================================================================
+        function openLahanModal(editId = null) {
+            const modal = document.getElementById('modal-lahan');
+            const form = document.getElementById('form-lahan');
+            form.reset();
+
+            if (editId) {
+                const lahan = state.lahanList.find(l => l.id === editId);
+                if (lahan) {
+                    document.getElementById('modal-lahan-title').textContent = 'Edit Data Lahan';
+                    document.getElementById('lahan-id').value = lahan.id;
+                    document.getElementById('lahan-nama').value = lahan.nama;
+                    document.getElementById('lahan-luas').value = lahan.luas;
+                    document.getElementById('lahan-satuan').value = lahan.satuan;
+                    document.getElementById('lahan-status').value = lahan.status;
+                    document.getElementById('lahan-tanggal-mulai').value = lahan.tanggalMulai || '';
+                    document.getElementById('lahan-lokasi').value = lahan.lokasi || '';
+                }
+            } else {
+                document.getElementById('modal-lahan-title').textContent = 'Tambah Lahan Baru';
+                document.getElementById('lahan-id').value = '';
+                document.getElementById('lahan-tanggal-mulai').value = new Date().toISOString().split('T')[0];
+            }
+
+            modal.classList.remove('sheet-hidden');
+        }
+
+        function closeLahanModal() {
+            document.getElementById('modal-lahan').classList.add('sheet-hidden');
+        }
+
+        function saveLahan(e) {
+            e.preventDefault();
+            const id = document.getElementById('lahan-id').value;
+            const nama = document.getElementById('lahan-nama').value.trim();
+            const luas = parseFloat(document.getElementById('lahan-luas').value);
+            const satuan = document.getElementById('lahan-satuan').value;
+            const status = document.getElementById('lahan-status').value;
+            const tanggalMulai = document.getElementById('lahan-tanggal-mulai').value;
+            const lokasi = document.getElementById('lahan-lokasi').value.trim();
+
+            if (id) {
+                const idx = state.lahanList.findIndex(l => l.id === id);
+                if (idx !== -1) {
+                    state.lahanList[idx] = { id, nama, luas, satuan, status, tanggalMulai, lokasi };
+                }
+                showSnackbar('Data lahan berhasil diperbarui');
+            } else {
+                const newLahan = {
+                    id: 'lahan-' + Date.now(),
+                    nama,
+                    luas,
+                    satuan,
+                    status,
+                    tanggalMulai,
+                    lokasi
+                };
+                state.lahanList.push(newLahan);
+                state.activeLahanId = newLahan.id;
+                showSnackbar('Lahan baru berhasil ditambahkan');
+            }
+
+            persistData();
+            closeLahanModal();
+            renderAll();
+        }
+
+        function confirmDeleteLahan(lahanId) {
+            openConfirmDialog(
+                'Hapus Data Lahan?',
+                'Menghapus lahan ini juga akan menghapus seluruh catatan progres yang terkait dengannya.',
+                () => {
+                    state.lahanList = state.lahanList.filter(l => l.id !== lahanId);
+                    state.progresList = state.progresList.filter(p => p.lahanId !== lahanId);
+                    if (state.activeLahanId === lahanId) state.activeLahanId = 'ALL';
+                    persistData();
+                    renderAll();
+                    showSnackbar('Lahan dan riwayatnya telah dihapus');
+                }
+            );
+        }
+
+        // =========================================================================
+        // 6. PROGRES BUDIDAYA CRUD & DYNAMIC FORM FIELDS
+        // =========================================================================
+        function selectProgresStage(stageKey, existingDetails = {}) {
+            document.getElementById('progres-kategori').value = stageKey;
+
+            // Update visual grid selector buttons
+            document.querySelectorAll('.stage-sel-btn').forEach(btn => {
+                if (btn.dataset.selstage === stageKey) {
+                    btn.className = 'stage-sel-btn p-2 rounded-xl border-2 border-emerald-600 bg-emerald-50 text-emerald-950 text-left shadow-2xs transition';
+                } else {
+                    btn.className = 'stage-sel-btn p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 text-left transition';
+                }
+            });
+
+            // Update photo upload prompt specific to the chosen stage
+            const meta = STAGE_META[stageKey] || STAGE_META.bibit;
+            document.getElementById('foto-stage-title').textContent = meta.photoTitle;
+            document.getElementById('foto-stage-hint').textContent = meta.photoHint;
+
+            renderDynamicProgresFields(existingDetails);
+        }
+
+        function openProgresModal(editId = null, presetStage = 'bibit') {
+            if (state.lahanList.length === 0) {
+                showSnackbar('Tambahkan data lahan terlebih dahulu!', true);
+                openLahanModal();
+                return;
+            }
+
+            const modal = document.getElementById('modal-progres');
+            const form = document.getElementById('form-progres');
+            form.reset();
+            state.currentUploadedPhotos = [];
+            renderUploadedPhotosPreview();
+
+            // Populate Lahan Select inside Modal
+            const lahanSelect = document.getElementById('progres-lahan-id');
+            lahanSelect.innerHTML = state.lahanList.map(l => 
+                `<option value="${l.id}">${l.nama} (${l.luas} ${l.satuan})</option>`
+            ).join('');
+
+            if (editId) {
+                const item = state.progresList.find(p => p.id === editId);
+                if (item) {
+                    document.getElementById('modal-progres-title').textContent = 'Edit Catatan & Foto Progres';
+                    document.getElementById('progres-id').value = item.id;
+                    lahanSelect.value = item.lahanId;
+                    document.getElementById('progres-tanggal').value = item.tanggal;
+                    document.getElementById('progres-catatan').value = item.catatan || '';
+
+                    selectProgresStage(item.kategori, item.details);
+
+                    state.currentUploadedPhotos = normalizePhotos(item).map(p => ({ ...p }));
+                    renderUploadedPhotosPreview();
+                }
+            } else {
+                document.getElementById('modal-progres-title').textContent = 'Catat Progres Budidaya';
+                document.getElementById('progres-id').value = '';
+                if (state.activeLahanId !== 'ALL') {
+                    lahanSelect.value = state.activeLahanId;
+                }
+                document.getElementById('progres-tanggal').value = new Date().toISOString().split('T')[0];
+                selectProgresStage(presetStage);
+            }
+
+            modal.classList.remove('sheet-hidden');
+            lucide.createIcons();
+        }
+
+        function closeProgresModal() {
+            document.getElementById('modal-progres').classList.add('sheet-hidden');
+        }
+
+        function renderDynamicProgresFields(existingDetails = {}) {
+            const kategori = document.getElementById('progres-kategori').value;
+            const container = document.getElementById('dynamic-progres-fields');
+            const d = existingDetails || {};
+
+            let html = '';
+            switch (kategori) {
+                case 'bibit':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jumlah *</label>
+                                <input type="number" id="dyn-jumlahBibit" required min="1" value="${d.jumlahBibit || ''}" placeholder="2000" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Satuan</label>
+                                <select id="dyn-satuanBibit" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                                    <option value="Stek" ${d.satuanBibit === 'Stek' ? 'selected' : ''}>Stek</option>
+                                    <option value="Batang" ${d.satuanBibit === 'Batang' ? 'selected' : ''}>Batang</option>
+                                    <option value="Kg" ${d.satuanBibit === 'Kg' ? 'selected' : ''}>Kg</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Sumber *</label>
+                                <select id="dyn-sumberAsal" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                                    <option value="Beli" ${d.sumberAsal === 'Beli' ? 'selected' : ''}>Beli</option>
+                                    <option value="Stek Sendiri" ${d.sumberAsal === 'Stek Sendiri' ? 'selected' : ''}>Stek Sendiri</option>
+                                    <option value="Bantuan" ${d.sumberAsal === 'Bantuan' ? 'selected' : ''}>Bantuan</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Pemasok / Varietas / Harga Beli</label>
+                            <input type="text" id="dyn-detailSumber" value="${escapeHtml(d.detailSumber || '')}" placeholder="Contoh: Rp 300/stek dari petani lokal, 2-3 ruas" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                        </div>
+                    `;
+                    break;
+
+                case 'tanam':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jarak Tanam *</label>
+                                <input type="text" id="dyn-jarakTanam" required value="${escapeHtml(d.jarakTanam || '60x40 cm')}" placeholder="60x40 cm" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Posisi Tanam</label>
+                                <select id="dyn-metodeTanam" class="w-full px-2 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                                    <option value="Miring 45 Derajat" ${d.metodeTanam === 'Miring 45 Derajat' ? 'selected' : ''}>Miring 45°</option>
+                                    <option value="Tegak Lurus" ${d.metodeTanam === 'Tegak Lurus' ? 'selected' : ''}>Tegak</option>
+                                    <option value="Tidur / Rebah" ${d.metodeTanam === 'Tidur / Rebah' ? 'selected' : ''}>Tidur</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Tenaga (Org)</label>
+                                <input type="number" id="dyn-tenagaKerja" min="1" value="${d.tenagaKerja || ''}" placeholder="2" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'pupuk_awal':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jenis Pupuk Dasar *</label>
+                                <input type="text" id="dyn-jenisPupuk" required value="${escapeHtml(d.jenisPupuk || '')}" placeholder="Kohe Sapi / Kompos / NPK" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Dosis (Kg) *</label>
+                                <input type="number" step="any" id="dyn-dosisKg" required value="${d.dosisKg || ''}" placeholder="300" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Cara Aplikasi Pupuk</label>
+                            <input type="text" id="dyn-caraAplikasi" value="${escapeHtml(d.caraAplikasi || '')}" placeholder="Contoh: Tebar merata di larikan / lubang tanam" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                        </div>
+                    `;
+                    break;
+
+                case 'pemeliharaan':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Umur (HST)</label>
+                                <input type="number" id="dyn-umurHst" min="1" value="${d.umurHst || ''}" placeholder="30" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Tinggi (cm) *</label>
+                                <input type="number" id="dyn-tinggiCm" required min="1" value="${d.tinggiCm || ''}" placeholder="75" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Perawatan *</label>
+                                <select id="dyn-kegiatan" class="w-full px-2 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                                    <option value="Penyiangan Gulma" ${d.kegiatan === 'Penyiangan Gulma' ? 'selected' : ''}>Siang Gulma</option>
+                                    <option value="Pembumbunan Tanah" ${d.kegiatan === 'Pembumbunan Tanah' ? 'selected' : ''}>Pendangiran</option>
+                                    <option value="Penyiraman / Irigasi" ${d.kegiatan === 'Penyiraman / Irigasi' ? 'selected' : ''}>Penyiraman</option>
+                                    <option value="Penyulaman Bibit Mati" ${d.kegiatan === 'Penyulaman Bibit Mati' ? 'selected' : ''}>Penyulaman</option>
+                                    <option value="Kontrol Rutin" ${d.kegiatan === 'Kontrol Rutin' ? 'selected' : ''}>Kontrol Rutin</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Kondisi Kesehatan Rumput</label>
+                            <input type="text" id="dyn-kondisi" value="${escapeHtml(d.kondisi || 'Subur, Daun Hijau Segar')}" placeholder="Subur, normal, atau ada serangan hama..." class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                        </div>
+                    `;
+                    break;
+
+                case 'pupuk_susulan':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Susulan Ke-</label>
+                                <input type="number" id="dyn-susulanKe" min="1" value="${d.susulanKe || 1}" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jenis Pupuk *</label>
+                                <input type="text" id="dyn-jenisPupuk" required value="${escapeHtml(d.jenisPupuk || '')}" placeholder="Urea / NPK" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Dosis (Kg) *</label>
+                                <input type="number" step="any" id="dyn-dosisKg" required value="${d.dosisKg || ''}" placeholder="25" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'panen':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Panen Ke- *</label>
+                                <input type="number" id="dyn-panenKe" required min="1" value="${d.panenKe || 1}" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Hasil (Kg) *</label>
+                                <input type="number" step="any" id="dyn-hasilKg" required min="1" value="${d.hasilKg || ''}" placeholder="2500" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Umur (Hari)</label>
+                                <input type="number" id="dyn-umurPanenHari" value="${d.umurPanenHari || 60}" placeholder="60" class="w-full px-2.5 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Estimasi Nilai Jual / Peruntukan Pakan</label>
+                            <input type="text" id="dyn-estimasiNilai" value="${escapeHtml(d.estimasiNilai || '')}" placeholder="Contoh: Pakan 15 ekor sapi / Dijual Rp 700/kg" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                        </div>
+                    `;
+                    break;
+            }
+            container.innerHTML = html;
+        }
+
+        function extractDynamicDetails(kategori) {
+            switch (kategori) {
+                case 'bibit':
+                    return {
+                        jumlahBibit: parseFloat(document.getElementById('dyn-jumlahBibit').value) || 0,
+                        satuanBibit: document.getElementById('dyn-satuanBibit').value,
+                        sumberAsal: document.getElementById('dyn-sumberAsal').value,
+                        detailSumber: document.getElementById('dyn-detailSumber').value.trim()
+                    };
+                case 'tanam':
+                    return {
+                        jarakTanam: document.getElementById('dyn-jarakTanam').value.trim(),
+                        metodeTanam: document.getElementById('dyn-metodeTanam').value,
+                        tenagaKerja: parseInt(document.getElementById('dyn-tenagaKerja').value) || 0
+                    };
+                case 'pupuk_awal':
+                    return {
+                        jenisPupuk: document.getElementById('dyn-jenisPupuk').value.trim(),
+                        dosisKg: parseFloat(document.getElementById('dyn-dosisKg').value) || 0,
+                        caraAplikasi: document.getElementById('dyn-caraAplikasi').value.trim()
+                    };
+                case 'pupuk_susulan':
+                    return {
+                        susulanKe: parseInt(document.getElementById('dyn-susulanKe').value) || 1,
+                        jenisPupuk: document.getElementById('dyn-jenisPupuk').value.trim(),
+                        dosisKg: parseFloat(document.getElementById('dyn-dosisKg').value) || 0
+                    };
+                case 'pemeliharaan':
+                    return {
+                        umurHst: parseInt(document.getElementById('dyn-umurHst').value) || 0,
+                        tinggiCm: parseFloat(document.getElementById('dyn-tinggiCm').value) || 0,
+                        kegiatan: document.getElementById('dyn-kegiatan').value,
+                        kondisi: document.getElementById('dyn-kondisi').value.trim()
+                    };
+                case 'panen':
+                    return {
+                        panenKe: parseInt(document.getElementById('dyn-panenKe').value) || 1,
+                        hasilKg: parseFloat(document.getElementById('dyn-hasilKg').value) || 0,
+                        umurPanenHari: parseInt(document.getElementById('dyn-umurPanenHari').value) || 60,
+                        estimasiNilai: document.getElementById('dyn-estimasiNilai').value.trim()
+                    };
+                default:
+                    return {};
+            }
+        }
+
+        function saveProgres(e) {
+            e.preventDefault();
+            const id = document.getElementById('progres-id').value;
+            const lahanId = document.getElementById('progres-lahan-id').value;
+            const kategori = document.getElementById('progres-kategori').value;
+            const tanggal = document.getElementById('progres-tanggal').value;
+            const catatan = document.getElementById('progres-catatan').value.trim();
+            const details = extractDynamicDetails(kategori);
+            const fotos = state.currentUploadedPhotos.map(p => ({ ...p }));
+
+            if (id) {
+                const idx = state.progresList.findIndex(p => p.id === id);
+                if (idx !== -1) {
+                    state.progresList[idx] = { id, lahanId, kategori, tanggal, details, catatan, fotos };
+                }
+                showSnackbar('Catatan & foto progres diperbarui');
+            } else {
+                state.progresList.push({
+                    id: 'prog-' + Date.now(),
+                    lahanId,
+                    kategori,
+                    tanggal,
+                    details,
+                    catatan,
+                    fotos
+                });
+                showSnackbar(`Progres ${STAGE_META[kategori].shortLabel} tersimpan!`);
+            }
+
+            // Otomatis update status lahan jika tahapan panen atau tanam
+            const targetLahan = state.lahanList.find(l => l.id === lahanId);
+            if (targetLahan && !id) {
+                if (kategori === 'tanam') targetLahan.status = 'Aktif Tanam';
+                if (kategori === 'panen') targetLahan.status = 'Istirahat / Pasca Panen';
+            }
+
+            try {
+                persistData();
+                closeProgresModal();
+                renderAll();
+            } catch (err) {
+                showSnackbar('Memori browser penuh! Kurangi jumlah foto lama.', true);
+            }
+        }
+
+        function confirmDeleteProgres(progresId) {
+            openConfirmDialog(
+                'Hapus Catatan Progres?',
+                'Catatan tahapan dan seluruh foto progres ini akan dihapus permanen.',
+                () => {
+                    state.progresList = state.progresList.filter(p => p.id !== progresId);
+                    persistData();
+                    renderAll();
+                    showSnackbar('Catatan progres dihapus');
+                }
+            );
+        }
+
+        // =========================================================================
+        // 7. MULTI-PHOTO UPLOAD & CLIENT-SIDE CANVAS COMPRESSION
+        // =========================================================================
+        function compressImageFile(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 800;
+                        const scaleSize = img.width > MAX_WIDTH ? (MAX_WIDTH / img.width) : 1;
+                        canvas.width = img.width * scaleSize;
+                        canvas.height = img.height * scaleSize;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+                        resolve(compressedBase64);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        async function handleMultiPhotoUpload(event) {
+            const files = Array.from(event.target.files || []);
+            if (files.length === 0) return;
+
+            for (const file of files) {
+                if (state.currentUploadedPhotos.length >= 6) {
+                    showSnackbar('Maksimal 6 foto per catatan tahapan', true);
+                    break;
+                }
+                const compressed = await compressImageFile(file);
+                state.currentUploadedPhotos.push({
+                    src: compressed,
+                    caption: ''
+                });
+            }
+
+            event.target.value = '';
+            renderUploadedPhotosPreview();
+        }
+
+        function updatePhotoCaption(index, value) {
+            if (state.currentUploadedPhotos[index]) {
+                state.currentUploadedPhotos[index].caption = value;
+            }
+        }
+
+        function removePhotoAtIndex(index) {
+            state.currentUploadedPhotos.splice(index, 1);
+            renderUploadedPhotosPreview();
+        }
+
+        function renderUploadedPhotosPreview() {
+            const grid = document.getElementById('foto-multi-grid');
+            const counterPill = document.getElementById('foto-counter-pill');
+            const count = state.currentUploadedPhotos.length;
+
+            counterPill.textContent = `${count} Foto`;
+
+            if (count === 0) {
+                grid.classList.add('hidden');
+                grid.innerHTML = '';
+                return;
+            }
+
+            grid.classList.remove('hidden');
+            grid.innerHTML = state.currentUploadedPhotos.map((photo, idx) => `
+                <div class="bg-white rounded-xl p-1.5 border border-emerald-200 shadow-2xs space-y-1.5 relative">
+                    <div class="relative aspect-4/3 rounded-lg overflow-hidden bg-slate-100">
+                        <img src="${photo.src}" alt="Preview ${idx + 1}" class="w-full h-full object-cover">
+                        <button type="button" onclick="removePhotoAtIndex(${idx})" class="absolute top-1.5 right-1.5 bg-red-600 text-white p-1 rounded-full shadow-md hover:bg-red-700">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                    <input type="text" value="${escapeHtml(photo.caption || '')}" oninput="updatePhotoCaption(${idx}, this.value)" placeholder="Keterangan foto ${idx + 1}..." class="w-full px-2 py-1 text-[11px] rounded-lg border border-slate-200 focus:outline-none focus:border-emerald-500">
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // =========================================================================
+        // 8. LIGHTBOX, BACKUP JSON, CONFIRMATION & UTILITIES
+        // =========================================================================
+        function openLightbox(progresId, photoIndex = 0) {
+            const item = state.progresList.find(p => p.id === progresId);
+            if (!item) return;
+            const photos = normalizePhotos(item);
+            if (!photos[photoIndex]) return;
+
+            const photo = photos[photoIndex];
+            const meta = STAGE_META[item.kategori] || STAGE_META.pemeliharaan;
+            const lahan = state.lahanList.find(l => l.id === item.lahanId);
+
+            document.getElementById('lightbox-img').src = photo.src;
+            document.getElementById('lightbox-caption').innerHTML = `
+                <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white mb-1">${meta.step}. ${meta.label} (${photoIndex + 1}/${photos.length})</span>
+                <p class="text-sm font-bold">${lahan ? lahan.nama : ''} • ${formatDateIndo(item.tanggal)}</p>
+                ${photo.caption ? `<p class="text-xs text-emerald-300 font-semibold mt-1">"${escapeHtml(photo.caption)}"</p>` : ''}
+                <p class="text-xs text-slate-300 mt-1">${escapeHtml(item.catatan || '')}</p>
+            `;
+
+            const modal = document.getElementById('modal-lightbox');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function exportBackupJson() {
+            const backupPayload = {
+                app: 'OdotTrack',
+                exportedAt: new Date().toISOString(),
+                lahanList: state.lahanList,
+                progresList: state.progresList
+            };
+            const blob = new Blob([JSON.stringify(backupPayload, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `OdotTrack-Backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showSnackbar('File backup JSON berhasil diunduh');
+        }
+
+        function importBackupJson(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsed = JSON.parse(e.target.result);
+                    if (Array.isArray(parsed.lahanList) && Array.isArray(parsed.progresList)) {
+                        state.lahanList = parsed.lahanList;
+                        state.progresList = parsed.progresList;
+                        state.activeLahanId = 'ALL';
+                        persistData();
+                        renderAll();
+                        showSnackbar('Data backup berhasil dipulihkan!');
+                    } else {
+                        showSnackbar('Format file JSON tidak valid', true);
+                    }
+                } catch (err) {
+                    showSnackbar('Gagal membaca file backup JSON', true);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+            const modal = document.getElementById('modal-progres');
+            const form = document.getElementById('form-progres');
+            form.reset();
+            removeSelectedPhoto();
+
+            // Populate Lahan Select inside Modal
+            const lahanSelect = document.getElementById('progres-lahan-id');
+            lahanSelect.innerHTML = state.lahanList.map(l => 
+                `<option value="${l.id}">${l.nama} (${l.luas} ${l.satuan})</option>`
+            ).join('');
+
+            if (editId) {
+                const item = state.progresList.find(p => p.id === editId);
+                if (item) {
+                    document.getElementById('modal-progres-title').textContent = 'Edit Catatan Progres';
+                    document.getElementById('progres-id').value = item.id;
+                    lahanSelect.value = item.lahanId;
+                    document.getElementById('progres-kategori').value = item.kategori;
+                    document.getElementById('progres-tanggal').value = item.tanggal;
+                    document.getElementById('progres-catatan').value = item.catatan || '';
+
+                    renderDynamicProgresFields(item.details);
+
+                    if (item.foto) {
+                        state.currentUploadedPhotoBase64 = item.foto;
+                        document.getElementById('foto-preview-img').src = item.foto;
+                        document.getElementById('foto-preview-wrapper').classList.remove('hidden');
+                        document.getElementById('foto-btn-label').textContent = 'Ganti Foto Progres';
+                    }
+                }
+            } else {
+                document.getElementById('modal-progres-title').textContent = 'Catat Progres Budidaya';
+                document.getElementById('progres-id').value = '';
+                if (state.activeLahanId !== 'ALL') {
+                    lahanSelect.value = state.activeLahanId;
+                }
+                // Default tanggal hari ini
+                document.getElementById('progres-tanggal').value = new Date().toISOString().split('T')[0];
+                renderDynamicProgresFields();
+            }
+
+            modal.classList.remove('sheet-hidden');
+            lucide.createIcons();
+        }
+
+        function closeProgresModal() {
+            document.getElementById('modal-progres').classList.add('sheet-hidden');
+        }
+
+        function renderDynamicProgresFields(existingDetails = {}) {
+            const kategori = document.getElementById('progres-kategori').value;
+            const container = document.getElementById('dynamic-progres-fields');
+            const d = existingDetails || {};
+
+            let html = '';
+            switch (kategori) {
+                case 'bibit':
+                    html = `
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jumlah Bibit (Stek) *</label>
+                                <input type="number" id="dyn-jumlahBibit" required min="1" value="${d.jumlahBibit || ''}" placeholder="Misal: 2000" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Sumber Asal *</label>
+                                <select id="dyn-sumberAsal" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                                    <option value="Beli" ${d.sumberAsal === 'Beli' ? 'selected' : ''}>Beli Bibit</option>
+                                    <option value="Stek Sendiri" ${d.sumberAsal === 'Stek Sendiri' ? 'selected' : ''}>Stek Sendiri</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Keterangan / Harga Beli / Varietas</label>
+                            <input type="text" id="dyn-detailSumber" value="${escapeHtml(d.detailSumber || '')}" placeholder="Contoh: Rp 300/stek dari petani lokal, 2-3 ruas" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                        </div>
+                    `;
+                    break;
+
+                case 'tanam':
+                    html = `
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jarak Tanam *</label>
+                                <input type="text" id="dyn-jarakTanam" required value="${escapeHtml(d.jarakTanam || '60 cm x 40 cm')}" placeholder="60 cm x 40 cm" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Posisi / Metode Tanam</label>
+                                <select id="dyn-metodeTanam" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                                    <option value="Miring 45 Derajat" ${d.metodeTanam === 'Miring 45 Derajat' ? 'selected' : ''}>Miring 45 Derajat</option>
+                                    <option value="Tegak Lurus" ${d.metodeTanam === 'Tegak Lurus' ? 'selected' : ''}>Tegak Lurus</option>
+                                    <option value="Tidur / Rebah" ${d.metodeTanam === 'Tidur / Rebah' ? 'selected' : ''}>Tidur / Rebah</option>
+                                </select>
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'pupuk_awal':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2.5">
+                            <div class="col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jenis Pupuk Dasar *</label>
+                                <input type="text" id="dyn-jenisPupuk" required value="${escapeHtml(d.jenisPupuk || '')}" placeholder="Kandang / Kompos / TSP" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Dosis (Kg) *</label>
+                                <input type="number" step="any" id="dyn-dosisKg" required value="${d.dosisKg || ''}" placeholder="300" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'pemeliharaan':
+                    html = `
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Tinggi Tanaman (cm) *</label>
+                                <input type="number" id="dyn-tinggiCm" required min="1" value="${d.tinggiCm || ''}" placeholder="Misal: 75" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Kegiatan Perawatan *</label>
+                                <select id="dyn-kegiatan" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                                    <option value="Penyiangan Gulma" ${d.kegiatan === 'Penyiangan Gulma' ? 'selected' : ''}>Penyiangan Gulma</option>
+                                    <option value="Pembumbunan Tanah" ${d.kegiatan === 'Pembumbunan Tanah' ? 'selected' : ''}>Pembumbunan Tanah</option>
+                                    <option value="Penyiraman / Irigasi" ${d.kegiatan === 'Penyiraman / Irigasi' ? 'selected' : ''}>Penyiraman / Irigasi</option>
+                                    <option value="Penyulaman Bibit Mati" ${d.kegiatan === 'Penyulaman Bibit Mati' ? 'selected' : ''}>Penyulaman Bibit Mati</option>
+                                    <option value="Kontrol Hama & Pertumbuhan" ${d.kegiatan === 'Kontrol Hama & Pertumbuhan' ? 'selected' : ''}>Kontrol Pertumbuhan</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-semibold text-slate-700 mb-1">Kondisi Kesehatan Rumput</label>
+                            <input type="text" id="dyn-kondisi" value="${escapeHtml(d.kondisi || 'Sehat, Daun Hijau Segar')}" placeholder="Sehat, anakan tumbuh rapat..." class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                        </div>
+                    `;
+                    break;
+
+                case 'pupuk_susulan':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2.5">
+                            <div class="col-span-2">
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Jenis Pupuk Susulan *</label>
+                                <input type="text" id="dyn-jenisPupuk" required value="${escapeHtml(d.jenisPupuk || '')}" placeholder="Urea / NPK / POC" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Dosis (Kg) *</label>
+                                <input type="number" step="any" id="dyn-dosisKg" required value="${d.dosisKg || ''}" placeholder="25" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                        </div>
+                    `;
+                    break;
+
+                case 'panen':
+                    html = `
+                        <div class="grid grid-cols-3 gap-2">
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Panen Ke- *</label>
+                                <input type="number" id="dyn-panenKe" required min="1" value="${d.panenKe || 1}" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Hasil (Kg) *</label>
+                                <input type="number" step="any" id="dyn-hasilKg" required min="1" value="${d.hasilKg || ''}" placeholder="2500" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-700 mb-1">Umur (Hari)</label>
+                                <input type="number" id="dyn-umurPanenHari" value="${d.umurPanenHari || 60}" placeholder="60" class="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-sm">
+                            </div>
+                        </div>
+                    `;
+                    break;
+            }
+            container.innerHTML = html;
+        }
+
+        function extractDynamicDetails(kategori) {
+            switch (kategori) {
+                case 'bibit':
+                    return {
+                        jumlahBibit: parseFloat(document.getElementById('dyn-jumlahBibit').value) || 0,
+                        sumberAsal: document.getElementById('dyn-sumberAsal').value,
+                        detailSumber: document.getElementById('dyn-detailSumber').value.trim()
+                    };
+                case 'tanam':
+                    return {
+                        jarakTanam: document.getElementById('dyn-jarakTanam').value.trim(),
+                        metodeTanam: document.getElementById('dyn-metodeTanam').value
+                    };
+                case 'pupuk_awal':
+                case 'pupuk_susulan':
+                    return {
+                        jenisPupuk: document.getElementById('dyn-jenisPupuk').value.trim(),
+                        dosisKg: parseFloat(document.getElementById('dyn-dosisKg').value) || 0
+                    };
+                case 'pemeliharaan':
+                    return {
+                        tinggiCm: parseFloat(document.getElementById('dyn-tinggiCm').value) || 0,
+                        kegiatan: document.getElementById('dyn-kegiatan').value,
+                        kondisi: document.getElementById('dyn-kondisi').value.trim()
+                    };
+                case 'panen':
+                    return {
+                        panenKe: parseInt(document.getElementById('dyn-panenKe').value) || 1,
+                        hasilKg: parseFloat(document.getElementById('dyn-hasilKg').value) || 0,
+                        umurPanenHari: parseInt(document.getElementById('dyn-umurPanenHari').value) || 60
+                    };
+                default:
+                    return {};
+            }
+        }
+
+        function saveProgres(e) {
+            e.preventDefault();
+            const id = document.getElementById('progres-id').value;
+            const lahanId = document.getElementById('progres-lahan-id').value;
+            const kategori = document.getElementById('progres-kategori').value;
+            const tanggal = document.getElementById('progres-tanggal').value;
+            const catatan = document.getElementById('progres-catatan').value.trim();
+            const details = extractDynamicDetails(kategori);
+            const foto = state.currentUploadedPhotoBase64;
+
+            if (id) {
+                const idx = state.progresList.findIndex(p => p.id === id);
+                if (idx !== -1) {
+                    state.progresList[idx] = { id, lahanId, kategori, tanggal, details, catatan, foto };
+                }
+                showSnackbar('Catatan progres berhasil diperbarui');
+            } else {
+                state.progresList.push({
+                    id: 'prog-' + Date.now(),
+                    lahanId,
+                    kategori,
+                    tanggal,
+                    details,
+                    catatan,
+                    foto
+                });
+                showSnackbar('Catatan progres baru tersimpan!');
+            }
+
+            // Otomatis update status lahan jika tahapan panen atau tanam
+            const targetLahan = state.lahanList.find(l => l.id === lahanId);
+            if (targetLahan && !id) {
+                if (kategori === 'tanam') targetLahan.status = 'Aktif Tanam';
+                if (kategori === 'panen') targetLahan.status = 'Istirahat / Pasca Panen';
+            }
+
+            try {
+                persistData();
+                closeProgresModal();
+                renderAll();
+            } catch (err) {
+                showSnackbar('Memori browser penuh! Hapus beberapa foto lama.', true);
+            }
+        }
+
+        function confirmDeleteProgres(progresId) {
+            openConfirmDialog(
+                'Hapus Catatan Progres?',
+                'Catatan tahapan dan foto progres ini akan dihapus permanen.',
+                () => {
+                    state.progresList = state.progresList.filter(p => p.id !== progresId);
+                    persistData();
+                    renderAll();
+                    showSnackbar('Catatan progres dihapus');
+                }
+            );
+        }
+
+        // =========================================================================
+        // 7. PHOTO UPLOAD & CLIENT-SIDE CANVAS COMPRESSION
+        // =========================================================================
+        function handlePhotoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // Kompresi ukuran gambar ke lebar maks 800px agar aman disimpan di localStorage
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const scaleSize = img.width > MAX_WIDTH ? (MAX_WIDTH / img.width) : 1;
+                    canvas.width = img.width * scaleSize;
+                    canvas.height = img.height * scaleSize;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.72);
+                    state.currentUploadedPhotoBase64 = compressedBase64;
+
+                    document.getElementById('foto-preview-img').src = compressedBase64;
+                    document.getElementById('foto-preview-wrapper').classList.remove('hidden');
+                    document.getElementById('foto-btn-label').textContent = 'Ganti Foto Progres';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeSelectedPhoto() {
+            state.currentUploadedPhotoBase64 = '';
+            document.getElementById('progres-foto-input').value = '';
+            document.getElementById('foto-preview-wrapper').classList.add('hidden');
+            document.getElementById('foto-preview-img').src = '';
+            document.getElementById('foto-btn-label').textContent = 'Ambil Foto / Pilih dari Galeri';
+        }
+
+        // =========================================================================
+        // 8. LIGHTBOX, CONFIRMATION & UTILITIES
+        // =========================================================================
+        function openLightbox(progresId) {
+            const item = state.progresList.find(p => p.id === progresId);
+            if (!item || !item.foto) return;
+
+            const meta = STAGE_META[item.kategori] || STAGE_META.pemeliharaan;
+            const lahan = state.lahanList.find(l => l.id === item.lahanId);
+
+            document.getElementById('lightbox-img').src = item.foto;
+            document.getElementById('lightbox-caption').innerHTML = `
+                <span class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-600 text-white mb-1">${meta.label}</span>
+                <p class="text-sm font-bold">${lahan ? lahan.nama : ''} • ${formatDateIndo(item.tanggal)}</p>
+                <p class="text-xs text-slate-300 mt-1">${escapeHtml(item.catatan || '')}</p>
+            `;
+
+            const modal = document.getElementById('modal-lightbox');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeLightbox() {
+            const modal = document.getElementById('modal-lightbox');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        let confirmCallback = null;
+        function openConfirmDialog(title, desc, onConfirm) {
+            document.getElementById('confirm-title').textContent = title;
+            document.getElementById('confirm-desc').textContent = desc;
+            confirmCallback = onConfirm;
+            
+            const modal = document.getElementById('modal-confirm');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeConfirmDialog() {
+            const modal = document.getElementById('modal-confirm');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            confirmCallback = null;
+        }
+
+        document.getElementById('confirm-yes-btn').addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            closeConfirmDialog();
+        });
+
+        function openResetConfirm() {
+            openConfirmDialog(
+                'Reset ke Data Contoh?',
+                'Semua data yang Anda tambahkan akan diganti kembali dengan data contoh bawaan.',
+                () => {
+                    localStorage.removeItem(STORAGE_KEY_LAHAN);
+                    localStorage.removeItem(STORAGE_KEY_PROGRES);
+                    state.activeLahanId = 'ALL';
+                    state.activeStageFilter = 'ALL';
+                    seedDummyData();
+                    renderAll();
+                    showSnackbar('Data berhasil di-reset ke contoh awal');
+                }
+            );
+        }
+
+        let snackbarTimer;
+        function showSnackbar(message, isError = false) {
+            const sb = document.getElementById('snackbar');
+            const textEl = document.getElementById('snackbar-text');
+            const iconEl = document.getElementById('snackbar-icon');
+
+            textEl.textContent = message;
+            if (isError) {
+                iconEl.setAttribute('data-lucide', 'alert-circle');
+                iconEl.className = 'w-4 h-4 text-red-400 shrink-0';
+            } else {
+                iconEl.setAttribute('data-lucide', 'check-circle-2');
+                iconEl.className = 'w-4 h-4 text-emerald-400 shrink-0';
+            }
+            lucide.createIcons();
+
+            sb.classList.remove('opacity-0', '-translate-y-4');
+            clearTimeout(snackbarTimer);
+            snackbarTimer = setTimeout(() => {
+                sb.classList.add('opacity-0', '-translate-y-4');
+            }, 3000);
+        }
+
+        function formatDateIndo(dateStr) {
+            if (!dateStr) return '-';
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            const parts = dateStr.split('-');
+            if (parts.length !== 3) return dateStr;
+            return `${parseInt(parts[2], 10)} ${months[parseInt(parts[1], 10) - 1]} ${parts[0]}`;
+        }
+
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        // Start App on Window Load
+        window.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>

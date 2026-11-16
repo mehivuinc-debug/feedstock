@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">OdotTrack</string>
+    <string name="app_subtitle">Jurnal &amp; Grafik Budidaya Rumput Odot</string>
+    <string name="nav_beranda">Beranda</string>
+    <string name="nav_grafik">Grafik</string>
+    <string name="nav_lahan">Lahan</string>
+    <string name="nav_galeri">Galeri</string>
+    <string name="fab_catat_progres">Catat Progres</string>
+    <string name="btn_tambah_lahan">Tambah Lahan</string>
+    <string name="btn_simpan">Simpan</string>
+    <string name="btn_batal">Batal</string>
+    <string name="cd_reset_demo">Reset Data Contoh</string>
+    <string name="cd_tutup">Tutup</string>
+    <string name="cd_hapus">Hapus</string>
+    <string name="cd_edit">Edit</string>
+    <string name="cd_foto_progres">Foto progres budidaya rumput odot</string>
+    <string name="cd_hero_banner">Hamparan kebun rumput odot hijau subur</string>
+</resources>

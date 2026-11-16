@@ -1,0 +1,6 @@
+{
+  "name": "OdotTrack",
+  "description": "Aplikasi monitoring progres budidaya rumput odot per lahan, dilengkapi catatan bibit, penanaman, pemupukan, pemeliharaan, hasil panen, foto progres, dan grafik produktivitas real-time.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
